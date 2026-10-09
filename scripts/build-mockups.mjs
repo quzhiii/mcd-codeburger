@@ -10,7 +10,7 @@
  * 运行：node scripts/build-mockups.mjs
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { ART, ART_EXTRA, renderBurger } from './mockup-art.mjs';
 import { PERSONAS } from '../src/persona/personas.ts';
@@ -26,13 +26,17 @@ const artSource = readFileSync(new URL('./mockup-art.mjs', import.meta.url), 'ut
 // 设计 token 与组件样式（四张稿共用，改这里四张一起变）
 // ---------------------------------------------------------------------------
 const CSS = `
+/* 风格方向：暖色轻拟物。
+   角色资产是厚涂 3D 渲染，纯白卡片会被它压得发飘，所以卡片改成暖白，
+   描边加重一档，投影改成「外投影 + 顶部内高光」，让角色有个能站住的托盘。 */
 :root{
-  --bg:#FFF7EC; --card:#FFFFFF;
+  --bg:#FFF7EC; --card:#FFFCF7;
   --ink:#241A14; --ink-2:#5C4B3F; --ink-3:#93816F;
   --brand:#E23B26; --accent:#FFC72C; --teal:#0FB5A6; --violet:#8E7BB5;
-  --line:rgba(36,26,20,.08); --line-2:rgba(36,26,20,.14);
+  --line:rgba(36,26,20,.10); --line-2:rgba(36,26,20,.16);
   --r-xl:26px; --r-lg:20px; --r-md:14px; --r-sm:10px;
-  --sh:0 8px 24px rgba(36,26,20,.07); --sh-2:0 14px 34px rgba(36,26,20,.10);
+  --sh:0 10px 26px rgba(36,26,20,.07), inset 0 1px 0 rgba(255,255,255,.92);
+  --sh-2:0 16px 36px rgba(36,26,20,.11), inset 0 1px 0 rgba(255,255,255,.95);
   --pad:20px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -52,9 +56,11 @@ body{
 .cb-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px var(--pad) 8px}
 .cb-brand{display:flex;align-items:baseline;gap:8px;min-width:0}
 .cb-brand__en{font-size:19px;font-weight:800;letter-spacing:-.3px;color:var(--brand)}
-.cb-brand__cn{font-size:12px;color:var(--ink-3);white-space:nowrap}
+.cb-brand__cn{font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb-topbar{flex-wrap:nowrap}
+.cb-topbar > .cb-chip,.cb-topbar > span.cb-chip{flex:0 0 auto}
 .cb-chip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:999px;
-  background:#fff;border:1px solid var(--line);font-size:11px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+  background:var(--card);border:1px solid var(--line);font-size:11px;font-weight:600;color:var(--ink-2);white-space:nowrap}
 .cb-chip--warn{background:#FFF4D6;border-color:#F2D98A;color:#8A6100}
 .cb-chip--demo{background:#EAF6F4;border-color:#B9E2DC;color:#0A7C71}
 
@@ -78,11 +84,23 @@ body{
 .cb-art{display:block}
 @keyframes cbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 .cb-art--float{animation:cbFloat 3.6s ease-in-out infinite}
+
+/* ---------- 角色正式资产（位图） ---------- */
+.cb-char{display:block;margin:0 auto;position:relative}
+@keyframes cbFloatImg{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.cb-char--float{animation:cbFloatImg 3.6s ease-in-out infinite}
+/* 托盘：给 3D 角色一层暖色柔光，让它不是"贴"在卡片上而是"站"在上面 */
+.cb-char-slot{position:relative;display:flex;align-items:center;justify-content:center}
+.cb-char-slot::before{
+  content:'';position:absolute;left:50%;top:52%;width:86%;padding-bottom:86%;transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(255,206,150,.34) 0%, rgba(255,206,150,0) 70%);
+  pointer-events:none}
 .cb-strip{display:flex;gap:10px;overflow-x:auto;padding:4px 0 12px;margin:0 calc(var(--pad) * -1);padding-left:var(--pad);padding-right:var(--pad);
   scrollbar-width:none}
 .cb-strip::-webkit-scrollbar{display:none}
 .cb-strip__item{flex:0 0 auto;width:84px;text-align:center}
-.cb-strip__box{width:84px;height:84px;border-radius:var(--r-md);background:#fff;border:1px solid var(--line);
+.cb-strip__box{width:84px;height:84px;border-radius:var(--r-md);background:var(--card);border:1px solid var(--line);
   display:flex;align-items:center;justify-content:center;overflow:hidden}
 .cb-strip__item.is-on .cb-strip__box{border-color:var(--brand);box-shadow:0 0 0 3px rgba(226,59,38,.12)}
 .cb-strip__name{font-size:11px;margin-top:6px;color:var(--ink-2);font-weight:600;line-height:1.3}
@@ -163,7 +181,7 @@ body{
 .cb-mood.is-on{background:var(--ink);border-color:var(--ink);color:#fff}
 .cb-mood__emo{font-size:15px}
 .cb-bubble{position:relative;margin-top:14px;padding:14px 16px;border-radius:var(--r-lg);
-  background:#fff;border:1px solid var(--line);box-shadow:var(--sh);font-size:13.5px;line-height:1.7;color:var(--ink-2)}
+  background:var(--card);border:1px solid var(--line);box-shadow:var(--sh);font-size:13.5px;line-height:1.7;color:var(--ink-2)}
 .cb-bubble__who{font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.4px;margin-bottom:6px}
 .cb-drop{margin-top:14px;height:132px;border-radius:var(--r-lg);border:2px dashed var(--line-2);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#FFFDF8}
@@ -207,7 +225,7 @@ body{
 .cb-sheet__title{font-size:32px;font-weight:800;letter-spacing:-.8px;margin-top:6px}
 .cb-sheet__sub{font-size:13px;color:var(--ink-3);line-height:1.7;text-align:right;max-width:420px}
 .cb-sheet__grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-.cb-sheet__cell{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 14px 16px;text-align:center;box-shadow:var(--sh)}
+.cb-sheet__cell{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 14px 16px;text-align:center;box-shadow:var(--sh)}
 .cb-sheet__art{display:flex;justify-content:center;margin-bottom:8px}
 .cb-sheet__no{font-size:10.5px;font-weight:700;color:var(--ink-3);letter-spacing:1px}
 .cb-sheet__name{font-size:17px;font-weight:800;letter-spacing:-.3px;margin-top:2px}
@@ -231,7 +249,43 @@ body{
 // 局部渲染助手
 // ---------------------------------------------------------------------------
 const f = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]);
-const art = (id, size, float = false) => renderBurger(ART[id] || ART_EXTRA[id], { size, float });
+const art = (id, size, float = false) => renderBurger(artOf(id), { size, float });
+
+// ---- 角色正式资产：位图优先，SVG 兜底 ----
+// out/ 下的文件名沿用源图编号，这里做一次 id → 文件名的映射
+const CHAR_STEM = {
+  'chili-social': '08-chili-social',
+  'night-slack': '07-night-slack',
+  'cheese-spark': '06-cheese-spark',
+  'calm-double': '05-calm-double',
+  'plan-drumstick': '04-plan-drumstick',
+  'risky-cod': '03-risky-cod',
+  'shaky-hashbrown': '02-shaky-hashbrown',
+  'zen-veggie': '01-zen-veggie',
+};
+const ART_OUT = path.resolve('docs/art/chatgpt-v1/out');
+const artFile = (id, plated) => CHAR_STEM[id] + (plated ? '@256-plated' : '') + '.png';
+
+/**
+ * 取一个角色。
+ * 有正式位图就用位图（外面套一层暖色柔光托盘，让 3D 角色是「站」在卡片上而不是贴在卡片上）；
+ * 没有就退回 SVG 骨架。
+ * plated 版本自带主色底盘，只在 48px 以下的位置用 ——
+ * 这个阈值是 docs/art/评审-小尺寸压力测试.png 实测出来的。
+ */
+function character(id, size, { float = false, plated = false, slot = true } = {}) {
+  const file = artFile(id, plated);
+  if (!existsSync(path.join(ART_OUT, file))) {
+    return renderBurger(artOf(id), { size, float });
+  }
+  const img =
+    '<img class="cb-char' + (float ? ' cb-char--float' : '') + '" ' +
+    'src="../docs/art/chatgpt-v1/out/' + file + '" ' +
+    'width="' + size + '" height="' + size + '" alt="' + PERSONA[id].name + '">';
+  return slot
+    ? '<div class="cb-char-slot" style="width:' + size + 'px;height:' + size + 'px">' + img + '</div>'
+    : img;
+}
 
 const topbar = (right = '') =>
   `<header class="cb-topbar">
@@ -280,7 +334,7 @@ const PAGE_SHEET = {
       const p = PERSONA[id];
       const v = p.visual;
       return `<div class="cb-sheet__cell">
-        <div class="cb-sheet__art">${renderBurger(artOf(id), { size: 140 })}</div>
+        <div class="cb-sheet__art">${character(id, 140)}</div>
         <div class="cb-sheet__no">0${i + 1}</div>
         <div class="cb-sheet__name">${p.name}</div>
         <div class="cb-sheet__kw">${p.keyword}</div>
@@ -339,7 +393,7 @@ const PAGE0 = {
       const v = p.visual;
       return `<div class="cb-card" style="margin-top:14px">
         <div style="display:flex;gap:16px;align-items:flex-start">
-          <div style="flex:0 0 112px;display:flex;align-items:center;justify-content:center">${renderBurger(c, { size: 108 })}</div>
+          <div style="flex:0 0 112px;display:flex;align-items:center;justify-content:center">${character(id, 108)}</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:baseline;gap:8px">
               <span style="font-size:11px;font-weight:700;color:var(--ink-3)">0${i + 1}</span>
@@ -368,7 +422,7 @@ const PAGE0 = {
       <div class="cb-strip" style="flex-wrap:wrap">
         ${ALL_IDS.map((id) => {
           const p = PERSONA[id];
-          return `<div class="cb-strip__item" style="width:64px"><div class="cb-strip__box" style="width:64px;height:64px">${renderBurger(artOf(id), { size: 56 })}</div><div class="cb-strip__name" style="font-size:10px">${p.name}</div></div>`;
+          return `<div class="cb-strip__item" style="width:64px"><div class="cb-strip__box" style="width:64px;height:64px">${character(id, 56, { plated: true, slot: false })}</div><div class="cb-strip__name" style="font-size:10px">${p.name}</div></div>`;
         }).join('')}
       </div>
     </div>
@@ -389,7 +443,7 @@ const PAGE1 = {
   ${topbar(chip('Demo'))}
 
   <div class="cb-main">
-    <section class="cb-hero">${art('chili-social', 210, true)}</section>
+    <section class="cb-hero">${character('chili-social', 230, { float: true })}</section>
 
     <h1 class="cb-h1">麦门人格汉堡工厂</h1>
     <p class="cb-slogan">Feed Your Agent.</p>
@@ -405,7 +459,7 @@ const PAGE1 = {
           .map((id, i) => {
             const c = artOf(id);
             return `<div class="cb-strip__item${i === 0 ? ' is-on' : ''}">
-              <div class="cb-strip__box">${renderBurger(c, { size: 74 })}</div>
+              <div class="cb-strip__box">${character(id, 72)}</div>
               <div class="cb-strip__name">${PERSONA[id].name}</div>
             </div>`;
           })
@@ -455,10 +509,10 @@ const PAGE2 = {
   title: 'CodeBurger · 生成与结果页',
   body: `
 <div class="cb-page">
-  ${topbar(chips(chip('Demo'), chip('reference 已关闭', 'warn')))}
+  ${topbar(chips(chip('Demo'), chip('参考层关闭', 'warn')))}
 
   <div class="cb-main">
-    <section class="cb-hero">${art('cheese-spark', 200, true)}</section>
+    <section class="cb-hero">${character('cheese-spark', 220, { float: true })}</section>
 
     <div style="text-align:center">
       <span class="cb-chip">已按你的答案组装完成</span>
@@ -583,7 +637,7 @@ const PAGE3 = {
         <span class="cb-block__sub">一次一个</span>
       </div>
       <div class="cb-drop">
-        ${art('cheese-spark', 96, true)}
+        ${character('cheese-spark', 104, { float: true })}
         <div class="cb-drop__txt">把它拖进去，或者点下面那颗按钮</div>
       </div>
       <div class="cb-actions">
@@ -597,7 +651,7 @@ const PAGE3 = {
       <div class="cb-strip">
         ${['chili-social', 'calm-double', 'night-slack', 'risky-cod']
           .map((id) => {
-            return `<div class="cb-strip__item"><div class="cb-strip__box">${renderBurger(artOf(id), { size: 70 })}</div><div class="cb-strip__name">${PERSONA[id].name}</div></div>`;
+            return `<div class="cb-strip__item"><div class="cb-strip__box">${character(id, 68)}</div><div class="cb-strip__name">${PERSONA[id].name}</div></div>`;
           })
           .join('')}
       </div>
@@ -629,7 +683,7 @@ const PAGE4 = {
           </div>
           <div class="cb-share__mark">麦门人格汉堡工厂</div>
         </div>
-        <div class="cb-share__art">${art('cheese-spark', 150, true)}</div>
+        <div class="cb-share__art">${character('cheese-spark', 168, { float: true })}</div>
         <div>
           <div class="cb-share__name">灵感芝士堡</div>
           <div class="cb-share__line">刚又想出三个主意，一个都没记住。</div>
