@@ -1,0 +1,23 @@
+# --- 依赖与产物 ---
+node_modules/
+dist/
+*.tsbuildinfo
+
+# --- 本地自查截图（可随时用 scripts/shot-mockups 重新生成）---
+.preview/
+
+# --- 合规红线：绝不入库的任何含凭证文件 ---
+mcp.json
+.mcp.json
+*.local.json
+data/*.local.json
+.env
+.env.*
+!.env.example
+
+# --- 编辑器 / 系统 ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

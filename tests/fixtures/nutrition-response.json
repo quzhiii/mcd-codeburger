@@ -1,0 +1,12 @@
+{
+  "_comment": "取自 2026-10-09 真机调用 list-nutrition-foods 的原始返回，仅保留 3 行用于结构回归。完整证据见 docs/gate-a-raw/。",
+  "markdownHeader": "# API Response Information\n\nBelow is the response from an API call. To help you understand the data, I've provided:\n\n1. A detailed description of all fields in the response structure\n2. The complete API response\n\n## Response Structure\n\n- **code**: 错误码 (Type: number)\n- **data**: 餐品热量列表(Type: string)\n- **message**: 错误信息 (Type: string)\n\n## Original Response",
+  "envelope": {
+    "success": true,
+    "code": 200,
+    "message": "请求成功",
+    "datetime": "2026-10-09 21:33:12",
+    "traceId": "fixture",
+    "data": "[160]{productName,nutritionDescription,energyKj,energyKcal,protein,fat,carbohydrate,sodium,calcium}:\n  猪柳麦满分,null,1288,308,16,16,24,781,213\n  猪柳蛋麦满分,null,1618,387,23,21,25,846,243\n  烟肉蛋麦满分,null,1089,260,16,10,24,483,238"
+  }
+}

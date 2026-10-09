@@ -1,0 +1,46 @@
+{
+  "_comment": "示例配置，不含任何真实凭证。真实 Token 只应存在于你本机的 ~/.workbuddy/mcp.json 或环境变量里，绝不进仓库。",
+  "_security": [
+    "《麦当劳MCP服务规则》第二条2：严禁将凭证分享给他人、发布在公开网络或托管至非官方认证的第三方平台。",
+    "第五条2：请勿在与 AI 的对话中输入您的 MCP Token。",
+    "本仓库的 .gitignore 已排除 mcp.json、.mcp.json、*.local.json、.env*。"
+  ],
+
+  "endpoint": "https://mcp.mcd.cn",
+  "transport": "streamable-http",
+  "protocolVersion": "2025-06-18",
+  "rateLimit": "600 次/分钟（每个 Token）",
+
+  "workbuddy": {
+    "_how": "把下面 mcpServers.mcd-mcp 这段合并进 %USERPROFILE%\\.workbuddy\\mcp.json，然后完全退出并重启 WorkBuddy（它在启动时才读这个文件）。",
+    "mcpServers": {
+      "mcd-mcp": {
+        "type": "http",
+        "url": "https://mcp.mcd.cn",
+        "headers": {
+          "Authorization": "Bearer ${MCD_MCP_TOKEN}"
+        }
+      }
+    }
+  },
+
+  "tokenSetup": {
+    "_how": "用仓库外的 tools/set-mcd-token.ps1 掩码填写，或用环境变量：",
+    "powershell": "$env:MCD_MCP_TOKEN = '<你的 token>'; .\\tools\\set-mcd-token.ps1",
+    "bash": "export MCD_MCP_TOKEN='<你的 token>'"
+  },
+
+  "verification": {
+    "_how": "配好之后跑一次探针，确认连通且检查项全 PASS",
+    "command": "npm run gate:a",
+    "artifacts": "docs/gate-a-raw/"
+  },
+
+  "compliance": {
+    "publicPages": "零 MCP 调用。公开页面不发起任何对 mcp.mcd.cn 的请求。",
+    "realCallsOnlyIn": "本地 WorkBuddy Skill，由使用者本人用自己配置的凭证触发。",
+    "dataset": "不公开分发完整官方营养数据集。",
+    "rulesVersion": "2025年12月3日",
+    "rulesUrl": "https://cdn.mcd.cn/cms/pages/MCPServerRules.html"
+  }
+}

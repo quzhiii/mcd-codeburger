@@ -1,0 +1,115 @@
+/* ============================================================
+   CodeBurger · 设计 token
+   风格目标：国内年轻用户审美，轻量清爽，避免欧美卡通海报式厚重 3D
+   ============================================================ */
+:root {
+  /* 底色：暖白，不用纯白，避免冷硬 */
+  --c-bg: #fff7ec;
+  --c-bg-soft: #fdf1e2;
+  --c-surface: #ffffff;
+  --c-surface-2: #fffaf3;
+
+  /* 品牌色 */
+  --c-brand: #e23b26; /* 主色：麦门红 */
+  --c-accent: #ffc72c; /* 辅助：暖阳黄 */
+  --c-teal: #0fb5a6; /* 次要：清爽青 */
+
+  /* 文字：暖黑，不用纯黑 */
+  --c-ink: #241a14;
+  --c-ink-2: #6b5a4d;
+  --c-ink-3: #a39284;
+
+  /* 线与分隔 */
+  --c-line: #f0e2d2;
+
+  /* 圆角 */
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* 阴影：低饱和柔和投影，不用硬边框 */
+  --sh-1: 0 2px 8px rgba(90, 60, 30, 0.06);
+  --sh-2: 0 6px 20px rgba(90, 60, 30, 0.1);
+  --sh-3: 0 14px 36px rgba(90, 60, 30, 0.14);
+
+  /* 动效：弹簧感 */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+/* 尊重用户的减少动效设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---- 工程骨架占位 ---- */
+.boot {
+  padding: 72px 24px;
+  text-align: center;
+}
+
+.boot__brand {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--c-brand);
+  text-transform: uppercase;
+}
+
+.boot__title {
+  margin: 10px 0 4px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.boot__slogan {
+  margin: 0;
+  font-size: 14px;
+  color: var(--c-teal);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.boot__note {
+  margin: 26px 0 0;
+  font-size: 13px;
+  color: var(--c-ink-2);
+}
