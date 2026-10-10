@@ -3,10 +3,11 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# --- 本地自查截图（可随时用 scripts/shot-mockups 重新生成）---
+# --- 本地自查截图 ---
 .preview/
 
-# --- 合规红线：绝不入库的任何含凭证文件 ---
+# ================= 合规红线：绝不入库 =================
+# 含凭证文件
 mcp.json
 .mcp.json
 *.local.json
@@ -14,6 +15,41 @@ data/*.local.json
 .env
 .env.*
 !.env.example
+
+# 内部开发材料（只留本地，不公开）
+/internal/
+/prompts/
+/review/
+/scratch/
+/evidence/private/
+/docs/gate-a-raw/
+*.local.md
+*.trace.json
+*.log
+
+# docs/ 整个目录只作本地工作区，不入库。
+# 公开文档统一放在仓库根目录（README.md、MCP_INTEGRATION.md、workbuddy.md 等）。
+/docs/
+
+# 仅服务内部设计稿评审流程的中间产物（正式应用不依赖）
+/mockups/
+/tools/push-to-github.ps1
+
+# 只服务内部设计稿/美术流程的一次性脚本。
+# 对外可复现的脚本请显式列在下面，避免误伤。
+!/scripts/gate-a-probe.mjs
+!/scripts/feed-demo.mjs
+/scripts/art-extra.mjs
+/scripts/build-art-brief.mjs
+/scripts/build-art-review.mjs
+/scripts/build-mockups.mjs
+/scripts/export-art-meta.mjs
+/scripts/mockup-art.mjs
+/scripts/prep-art.py
+/scripts/shot-mockups.mjs
+
+# 注意：以上规则只影响「尚未跟踪的文件」。
+# 已提交过的内容不会自动移除，需另行 git rm --cached 处理。
 
 # --- 编辑器 / 系统 ---
 .DS_Store

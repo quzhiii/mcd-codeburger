@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 授权最小化：CI 只需要读代码
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci --no-audit --fund=false
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 单元测试
+        run: npm test
+
+      - name: 构建
+        run: npm run build
+
+      - name: 敏感信息扫描
+        run: |
+          # 硬编码凭证不应出现在公开仓库
+          if git grep -n -I -E \
+            '(Bearer [A-Za-z0-9._-]{16,}|sk-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})' \
+            -- . ; then
+            echo "::error::检测到疑似硬编码凭证"
+            exit 1
+          fi
+          echo "未检测到硬编码凭证"
+
+      - name: 内部材料防复发检查
+        run: |
+          # 这些路径一旦出现在主干即视为内部材料外泄
+          forbidden='^(internal|prompts|review|scratch|evidence/private|docs/gate-a-raw|docs/art|mockups)/'
+          if git ls-files | grep -Eq "$forbidden"; then
+            echo "::error::以下内部材料被误加入版本控制："
+            git ls-files | grep -E "$forbidden"
+            exit 1
+          fi
+          echo "未发现内部材料入库"

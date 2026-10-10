@@ -21,7 +21,7 @@
                       └──────────────────────────┘
 ```
 
-隔离不是偏好问题，是条款问题。依据见 `docs/GATE_A_EVIDENCE.md`。
+隔离不是偏好问题，是条款问题。条款要点与判定见本文与 `MCP_INTEGRATION.md`；完整取证记录保存在本地工作目录，不随公开仓库分发。
 
 ## 为什么是单应用而不是 monorepo
 
@@ -92,18 +92,16 @@ npm install
 
 **Windows 受限沙箱下会失败**，报 `Cannot find package 'esbuild'`。
 原因是 esbuild 的 postinstall 要 spawn 子进程被拒（`EBUSY`）。
-项目根已经放了 `.npmrc` 写 `ignore-scripts=true` 解决，原理见 `docs/SETUP_WINDOWS.md`。
+解决方式是用命令行参数 `npm install --ignore-scripts`，**不要写进仓库的 `.npmrc`** —— 那会影响所有克隆者的安装行为。
 
 ## 常用命令
 
 ```bash
 npm run dev         # 开发服务器，5180
 npm run build       # tsc --noEmit && vite build，产出纯静态 dist/
-npm test            # 19 条
-npm run gate:a      # 重跑 MCP 合规取证并刷新 docs/gate-a-raw/
-npm run mockups     # 生成四屏设计稿 + 对稿附件
-npm run brief       # 从 personas.ts 生成 docs/PERSONA_ART_BRIEF.md
-npm run review      # 生成三张评审页
+npm test            # 49 条
+npm run gate:a      # 重跑 MCP 合规取证（需自己的 Token）
+npm run skill:demo  # Burger Spec 本地自检（不联网、不用 Token）
 npm run art:meta    # 导出角色主色给 Python 处理脚本
 npm run art:prep    # 去白底 + 裁切 + 多档导出 + 生成带底盘小图
 ```
@@ -112,12 +110,11 @@ npm run art:prep    # 去白底 + 裁切 + 多档导出 + 生成带底盘小图
 
 ```
 ChatGPT 生图（1254² 白底）
-   → docs/art/chatgpt-v1/
+   → public/assets/personas/（最终产物）
    → npm run art:prep
         · 从四边漫水填充去白底（不会伤到面包高光）
         · 裁到内容外接框 → 补正方形 → 留 4% 边距
         · 导出 512² PNG/WebP + 256² PNG + 256² 带主色底盘
-   → docs/art/chatgpt-v1/out/
 ```
 
 带底盘的小图是给列表用的：这 8 只的剪影差异不大，36px 以下要靠主色底盘分开。

@@ -3,21 +3,27 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
   "description": "CodeBurger · 麦门人格汉堡工厂 — Feed Your Agent.",
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --test tests/persona.test.mjs tests/mcd-parse.test.mjs",
+    "test": "node --experimental-strip-types --test tests/persona.test.mjs tests/mcd-parse.test.mjs tests/github.test.mjs tests/burger-spec.test.mjs tests/feed.test.mjs",
+    "typecheck": "tsc --noEmit",
     "gate:a": "node --experimental-strip-types scripts/gate-a-probe.mjs",
-    "mockups": "node --experimental-strip-types scripts/build-mockups.mjs",
-    "brief": "node --experimental-strip-types scripts/build-art-brief.mjs",
-    "review": "node --experimental-strip-types scripts/build-art-review.mjs",
-    "art:meta": "node --experimental-strip-types scripts/export-art-meta.mjs",
-    "art:prep": "node --experimental-strip-types scripts/export-art-meta.mjs && python scripts/prep-art.py",
-    "shot": "node scripts/shot-mockups.mjs",
-    "snapshot": "node scripts/snapshot-mcd.mjs"
+    "skill:demo": "node --experimental-strip-types scripts/feed-demo.mjs"
   },
+  "keywords": [
+    "persona",
+    "quiz",
+    "canvas",
+    "vite",
+    "typescript"
+  ],
   "devDependencies": {
     "typescript": "^5.6.0",
     "vite": "^5.4.0"

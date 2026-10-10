@@ -18,12 +18,16 @@
 
 | Gate | 验什么 | 证据落在哪 |
 | --- | --- | --- |
-| A | MCP 条款原文 + 真机连通性 | `docs/GATE_A_EVIDENCE.md`、`docs/gate-a-raw/` |
+| A | MCP 条款原文 + 真机连通性 | 条款原文抓取脚本 + 验证记录（本地留存，不公开） |
 | 构建 | `tsc --noEmit` + 纯静态 `dist/` | `npm run build` |
 | 人格 | 1024 种答题组合全覆盖 | `tests/persona.test.mjs` |
 | 解析 | 真机返回原文的回归 | `tests/fixtures/nutrition-response.json` |
-| 视觉 | 四屏设计稿人工确认 | `docs/VISUAL_GATE.md`、`mockups/` |
-| 美术 | 生成图的小尺寸可辨识度实测 | `docs/ART_REVIEW_V1.md`、`docs/art/` |
+| 契约 | 虚拟层不得携带真实营养数据 | `tests/burger-spec.test.mjs` |
+| 投喂 | 无配料也能走通主流程 | `tests/feed.test.mjs` |
+| 加料 | GitHub 失败必须降级 | `tests/github.test.mjs` |
+
+Git 历史、内部评审材料与 MCP 原始取证留痕**不在公开仓库内**，保存在本地工作目录。
+公开仓库只保留产品交付物与可复现的验证手段（测试与 CI）。
 
 ## 二、WorkBuddy 具体承担了什么
 
@@ -47,15 +51,14 @@ WorkBuddy 直接从页面源码里抽出内嵌 JSON 取出正文，把 1794 字�
 
 ### 3. 内容生成的「机制一致性」而不是「人工盯一致性」
 
-四屏设计稿不是手写四份 HTML，是 `scripts/build-mockups.mjs` 从**一份共享 CSS + 一份共享角色画法**渲染出来的。
-角色美术需求表也不是手写的，是 `scripts/build-art-brief.mjs` 从 `src/persona/personas.ts` 生成的。
+角色设定表不是手写的，是脚本从 `src/persona/personas.ts` 生成的。角色美术需求表同理。
 
 原因：只要有第二个人、或者同一人隔几天再改，手写多份必然漂移。用单一事实来源 + 生成脚本，
 「四张统一」「表里写的和代码一致」是机制保证的，不靠自觉。
 
 ### 4. 美术资产的客观评审
 
-8 张 ChatGPT 生成的角色图回来之后，没有直接说好或不好，做了三件可量化的事：
+8 张角色图回来之后，没有直接说好或不好，做了三件可量化的事：
 
 - **色彩连续性**：统计 512px 下不透明像素里的不同颜色数（48.8%–75.7%），用数据说明这是连续色阶的厚涂渲染，不是扁平插画
 - **小尺寸压力测试**：1:1 逐档压到 64 / 48 / 36 / 24px，找出「剪影区分度不足」这个真问题
@@ -65,25 +68,28 @@ WorkBuddy 直接从页面源码里抽出内嵌 JSON 取出正文，把 1794 字�
 
 ### 5. 资产管线
 
-`scripts/prep-art.py` 把生图结果处理成可直接上网页的资产：
+去白底用**从四边做连通域漫水填充**，只删和边框连通的白色 —— 面包高光被角色包围，不会被误伤。
+裁到内容外接框、补正方形、留 4% 边距，导出 512² 去底 PNG 作为网页正式资产。
+处理脚本留在本地，最终产物（8 张 512² PNG，约 2.5MB）入库到 `public/assets/personas/`。
 
-- 去白底用**从四边做连通域漫水填充**，只删和边框连通的白色 —— 面包高光被角色包围，不会被误伤
-- 裁到内容外接框、补正方形、留 4% 边距
-- 导出 512² PNG/WebP + 256² + 256² 带主色底盘
-- WebP 比同尺寸 PNG 小约 81%
+### 6. 契约先行：Burger Spec
+
+本地 Skill 与网页要交换汉堡数据，一开始就定了唯一契约（`src/spec/burger-spec.ts`），
+并把「虚拟层不得携带真实营养数据」写成校验函数 + 单测 + CI 检查。
+这样合规红线就不是靠自觉，而是靠一条会失败的测试。
 
 ## 三、Windows 受限沙箱下的三个坑（都记在文档里了）
 
 | 坑 | 现象 | 处理 |
 | --- | --- | --- |
-| esbuild postinstall | `npm install` 报 EBUSY，构建报找不到 esbuild | 项目根 `.npmrc` 写 `ignore-scripts=true`，平台二进制由 `@esbuild/win32-x64` 直接提供 |
+| esbuild postinstall | `npm install` 报 EBUSY，构建报找不到 esbuild | 改用命令行参数 `npm install --ignore-scripts`，平台二进制由 `@esbuild/win32-x64` 直接提供；**不写进仓库 `.npmrc`**，避免影响所有克隆者 |
 | 管道中断长跑脚本 | `node x.mjs \| head` 触发 EPIPE，进程被杀，证据文件写成 0 字节 | 一律 `> logfile 2>&1` 再读 |
 | node spawn 子进程被拒 | `spawnSync` 同样 EBUSY | 脚本里打印出可直接复制的命令行，改由 shell 直调 |
 | git 写入异常 | `git commit` 挂死；`git checkout -b` 后索引全变成 `A` | 改用 `git write-tree` + `git commit-tree` + 手写 ref 文件 |
 | SSH 到 GitHub 不通 | github.com 解析到代理地址，22 端口 banner 阶段超时 | 改用 HTTPS，凭证助手是 `helper-selector -> gh`，无需交互输入 |
 | 连接器无建仓权限 | `POST /user/repos` 返回 `403 Resource not accessible by integration` | 建仓手动做一次，之后推送可自动化 |
 
-细节见 `docs/SETUP_WINDOWS.md`。
+完整环境说明见本地工作目录中的 SETUP_WINDOWS.md（不随公开仓库分发）。
 
 ## 四、人为把关的地方
 
@@ -103,7 +109,7 @@ cd mcd-codeburger
 npm install
 npm run build
 npm test
-npm run mockups
+npm run skill:demo
 ```
 
 MCP 相关的部分需要你自己的 Token，见 `mcp-config.example.json`。
