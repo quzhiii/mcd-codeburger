@@ -16,6 +16,7 @@
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import { parseNutritionResponse, extractEnvelope } from '../src/mcd-adapter/parse.ts';
@@ -27,11 +28,18 @@ const MAX_SAMPLE_ITEMS = 12; // 只保留极少样本用于证明字段结构，
 
 const log = (...a) => process.stdout.write(a.join(' ') + '\n');
 
+/**
+ * 凭证指纹。
+ *
+ * 刻意**不用**「前 3 位 + 后 4 位」那种掩码 —— 本仓库是公开的，
+ * 那种写法等于把真实凭证的片段发到公开网络上，违反《麦当劳MCP服务规则》第二条2。
+ * 改成 SHA-256 前 12 位：既能证明「多次运行用的是同一个 Token」，又不可逆、不泄露任何字符。
+ */
 function maskToken(raw) {
   if (!raw) return '(none)';
   const core = String(raw).replace(/^Bearer\s+/i, '').trim();
-  if (core.length <= 8) return '******(len=' + core.length + ')';
-  return core.slice(0, 3) + '****' + core.slice(-4) + ' (len=' + core.length + ')';
+  const h = createHash('sha256').update(core).digest('hex').slice(0, 12);
+  return `sha256:${h}`;
 }
 
 async function resolveToken() {
