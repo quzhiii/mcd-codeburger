@@ -79,8 +79,11 @@ WorkBuddy 直接从页面源码里抽出内嵌 JSON 取出正文，把 1794 字�
 | esbuild postinstall | `npm install` 报 EBUSY，构建报找不到 esbuild | 项目根 `.npmrc` 写 `ignore-scripts=true`，平台二进制由 `@esbuild/win32-x64` 直接提供 |
 | 管道中断长跑脚本 | `node x.mjs \| head` 触发 EPIPE，进程被杀，证据文件写成 0 字节 | 一律 `> logfile 2>&1` 再读 |
 | node spawn 子进程被拒 | `spawnSync` 同样 EBUSY | 脚本里打印出可直接复制的命令行，改由 shell 直调 |
+| git 写入异常 | `git commit` 挂死；`git checkout -b` 后索引全变成 `A` | 改用 `git write-tree` + `git commit-tree` + 手写 ref 文件 |
+| SSH 到 GitHub 不通 | github.com 解析到代理地址，22 端口 banner 阶段超时 | 改用 HTTPS，凭证助手是 `helper-selector -> gh`，无需交互输入 |
+| 连接器无建仓权限 | `POST /user/repos` 返回 `403 Resource not accessible by integration` | 建仓手动做一次，之后推送可自动化 |
 
-另外 `git commit` 在这个沙箱里会挂，提交走的是 `git write-tree` + `git commit-tree` + 手写 ref 的方式。
+细节见 `docs/SETUP_WINDOWS.md`。
 
 ## 四、人为把关的地方
 
