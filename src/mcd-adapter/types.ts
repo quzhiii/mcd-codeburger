@@ -2,7 +2,7 @@
  * 麦当劳 MCP 返回值里用到的数据类型。
  *
  * 说明：这里的字段名全部来自 `list-nutrition-foods` 的真机返回，
- * 证据见 docs/gate-a-raw/nutrition-sample.json 与 docs/GATE_A_EVIDENCE.md。
+ * 字段结构回归见 tests/fixtures/nutrition-response.json（取自真机调用的前 3 行）。
  */
 
 /** MCP 工具返回的两种信封 */

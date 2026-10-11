@@ -89,7 +89,7 @@ WorkBuddy 直接从页面源码里抽出内嵌 JSON 取出正文，把 1794 字�
 | SSH 到 GitHub 不通 | github.com 解析到代理地址，22 端口 banner 阶段超时 | 改用 HTTPS，凭证助手是 `helper-selector -> gh`，无需交互输入 |
 | 连接器无建仓权限 | `POST /user/repos` 返回 `403 Resource not accessible by integration` | 建仓手动做一次，之后推送可自动化 |
 
-完整环境说明见本地工作目录中的 SETUP_WINDOWS.md（不随公开仓库分发）。
+Windows 环境的三处坑与绕行办法，写在 `.npmrc` 的注释里，照着做即可。
 
 ## 四、人为把关的地方
 

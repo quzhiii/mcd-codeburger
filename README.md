@@ -123,7 +123,7 @@ npm run build     # 产出纯静态 dist/
 npm test          # 49 条单元测试
 npm run typecheck # 类型检查
 npm run gate:a    # 重跑 MCP 合规取证（需要自己的 Token）
-npm run skill:demo# Burger Spec 本地自检
+npm run skill:demo  # Burger Spec 本地自检
 ```
 
 Node 版本要求 ≥ 22.6（用到 `--experimental-strip-types`）。

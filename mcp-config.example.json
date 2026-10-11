@@ -25,15 +25,15 @@
   },
 
   "tokenSetup": {
-    "_how": "用仓库外的 tools/set-mcd-token.ps1 掩码填写，或用环境变量：",
-    "powershell": "$env:MCD_MCP_TOKEN = '<你的 token>'; .\\tools\\set-mcd-token.ps1",
+    "_how": "推荐用环境变量，避免任何脚本接触凭证：",
+    "powershell": "$env:MCD_MCP_TOKEN = '<你的 token>'",
     "bash": "export MCD_MCP_TOKEN='<你的 token>'"
   },
 
   "verification": {
     "_how": "配好之后跑一次探针，确认连通且检查项全 PASS",
     "command": "npm run gate:a",
-    "artifacts": "docs/gate-a-raw/"
+    "artifacts": "docs/gate-a-raw/（该目录已被 .gitignore 排除，证据只落本地，不入库）"
   },
 
   "compliance": {

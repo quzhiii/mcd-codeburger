@@ -1,7 +1,8 @@
 /**
  * 麦当劳 MCP 返回值解析层。
  *
- * 真机返回长这样（`list-nutrition-foods` 实测，详见 docs/GATE_A_EVIDENCE.md）：
+ * 真机返回长这样（`list-nutrition-foods` 实测；样本存于 tests/fixtures/nutrition-response.json，
+ * 完整取证记录保存在本地工作目录，不随仓库分发）：
  *
  * ```
  * # API Response Information
