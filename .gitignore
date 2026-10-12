@@ -2,7 +2,10 @@
 node_modules/
 dist/
 *.tsbuildinfo
-
+# --- 本地验证截图与脚本 ---
+/.v4-shots/
+.v4-*.mjs
+.v4-*.log
 # --- 本地自查截图 ---
 .preview/
 
@@ -50,6 +53,11 @@ data/*.local.json
 
 # 注意：以上规则只影响「尚未跟踪的文件」。
 # 已提交过的内容不会自动移除，需另行 git rm --cached 处理。
+
+# --- 本地验证截图与一次性脚本 ---
+/.v4-shots/
+.v4-*.mjs
+.v4-*.log
 
 # --- 编辑器 / 系统 ---
 .DS_Store
