@@ -504,36 +504,62 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   ctx.fillStyle = '#fff';
   ctx.fillText(`Lv.${lvBadge}`, W - CARD_X - badgeW / 2, 75);
 
-  // ---- 卡片高度：先给紧凑初值，内容画完后按真实位置向下补齐
+  // ---- 版式常量：预测量与正式绘制共用同一组数
   //
-  // 为什么初值要「偏小」而不是精确计算：
-  //   初值若偏大，补白条件 `neededH > cardH` 永远不成立，
-  //   内容超出的部分会被卡片底边裁掉（曾导致第3 行配料消失）。
-  // 所以这里刻意给小值，让补白逻辑一定生效。
+  // 这个坑踩过两次，都记在这里：
+  // 1. 属性条行数曾经写死成 2（实际 3 条），「配方」标题直接压到第三条属性栏上；
+  // 2. 卡片高度曾经按固定值截断，数据完整度区被切到卡外，和页脚声明叠成一团。
+  // 现在所有间距集中在此，高度先算后画，从根上消除这两类错位。
   const cardTop = 108;
-  const stageSize = 520;
-  const FOOT_RESERVE = 236; // 卡外：页脚文字 + 二维码
-  let cardH = Math.min(H - cardTop - FOOT_RESERVE, 600);
+  const PAD_TOP = 24;        // 卡片顶边 → 角色舞台
+  const LABEL_GAP = 54;      // 舞台底 → 「你的 AI 汉堡」
+  const NAME_GAP = 46;       // 标签 → 角色名基线
+  const TITLE_GAP = 38;      // 角色名 → 称号基线
+  const BARS_GAP = 44;       // 称号 → 第一条属性栏
+  const BAR_PITCH = 58;      // 属性栏行距
+  const AFTER_BARS = 26;     // 最后一条属性栏 → 「配方」
+  const RECIPE_TO_ROW = 66;  // 「配方」→ 第一行配料
+  const ING_PITCH = 46;      // 配料行距
+  const AFTER_INGS = 24;     // 最后一行配料 → 完整度区分隔线
+  const FOOT_GAP = 48;       // 配料区 → 完整度区分隔线（卡内）
+  const FOOT_BLOCK = 88;     // 分隔线 → 卡片内容底边
+  const STAGE_MAX = 480;     // 角色舞台上限
+  const STAGE_MIN = 300;     // 内容再挤也不能低于这个值
+  const FOOT_OUT_GAP = 64;   // 卡片底边 → 页脚标题基线（卡外）
+  // 卡外页脚实际占用：标题基线 + 两行声明 + 二维码底 + 底部边距
+  const FOOT_RESERVE = FOOT_OUT_GAP + 90 + 14;
 
-  // ---- 先精确测量名字与称号的行数，用它算出准确高度，再画白底。
-  // （font 要先设好才能measureText）
+  const nameMaxW = CARD_W - 96;
+  const attrCount = ATTRIBUTE_KEYS.length;
+  const ingCount = Math.min(3, dna.ingredients.length);
+
+  // ---- 先量后画：名字/称号的行数决定固定区高度，剩余空间全给舞台
+  // （font 要先设好才能 measureText）
   ctx.font = `800 52px ${FONT}`;
-  const nameW = ctx.measureText(dna.name).width;
-  ctx.font = `700 26px ${FONT}`;
-  const titleText = `${dna.level.title} · ${dna.tagline}`;
-  const titleW = ctx.measureText(titleText).width;
-
-  // 名字或称号需要换行时，预留两行空间
-  const needsWrap = nameW > CARD_W - 96 || titleW > CARD_W - 96;
-  if (needsWrap) {
-    cardH = Math.min(H - cardTop - FOOT_RESERVE, 660);
+  let nameSize = 52;
+  while (nameSize > 34 && ctx.measureText(dna.name).width > nameMaxW) {
+    nameSize -= 2;
   }
+  ctx.font = `800 ${nameSize}px ${FONT}`;
+  const nameLines = wrap(ctx, dna.name, nameMaxW, 2);
+  ctx.font = `700 26px ${FONT}`;
+  const titleLines = wrap(ctx, `${dna.level.title} · ${dna.tagline}`, nameMaxW, 2);
 
-  // 白底不在这里画 —— 它属于主画布（Pass 2），由内容实测高度决定
+  const fixedH =
+    PAD_TOP + LABEL_GAP + NAME_GAP +
+    (nameLines.length - 1) * (nameSize + 8) +
+    TITLE_GAP + (titleLines.length - 1) * 34 +
+    BARS_GAP + (attrCount - 1) * BAR_PITCH + 4 +
+    AFTER_BARS +
+    (ingCount > 0 ? RECIPE_TO_ROW + (ingCount - 1) * ING_PITCH : 44) +
+    AFTER_INGS + FOOT_GAP + FOOT_BLOCK;
+
+  const availCardH = H - cardTop - FOOT_RESERVE;
+  const stageSize = Math.max(STAGE_MIN, Math.min(STAGE_MAX, availCardH - fixedH));
 
   // ---- 角色 SVG（叠加渲染）
   const stageX = (W - stageSize) / 2;
-  const stageY = cardTop + 30;
+  const stageY = cardTop + PAD_TOP;
   // 注意：SVG 被编码成 data-URI 后，用 <image href="外部URL"> 引PNG
   // 在光栅化进 canvas 时会加载失败（异步资源来不及），表现为一块灰。
   // 所以先把 PNG 转成 data-URI 再嵌进 SVG，全链路同步、无跨源问题。
@@ -552,45 +578,39 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   }
 
   // ---- 角色名与称号
-  let y = stageY + stageSize + 62;
+  let y = stageY + stageSize + LABEL_GAP;
   ctx.textAlign = 'center';
   ctx.fillStyle = '#a39284';
   ctx.font = `600 24px ${FONT}`;
   ctx.fillText('你的 AI 汉堡', W / 2, y);
 
-  y += 52;
+  y += NAME_GAP;
   ctx.fillStyle = '#241a14';
   // 角色名可能较长（如「深夜干饭人 · 双城漫游者」），超宽时先缩字号再换行，避免冲出卡片
-  const nameMaxW = CARD_W - 96;
-  let nameSize = 52;
-  while (nameSize > 34 && ctx.measureText(dna.name).width > nameMaxW) {
-    nameSize -= 2;
-    ctx.font = `800 ${nameSize}px ${FONT}`;
-  }
-  const nameLines = wrap(ctx, dna.name, nameMaxW, 2);
-  for (const line of nameLines) {
-    ctx.fillText(line, W / 2, y);
-    y += nameSize + 8;
-  }
-  y -= nameSize + 8;
+  // 行数在预测量阶段已算好，这里按同一结果绘制，保证高度预估与成品一致
+  ctx.font = `800 ${nameSize}px ${FONT}`;
+  nameLines.forEach((line, i) => {
+    ctx.fillText(line, W / 2, y + i * (nameSize + 8));
+  });
+  y += (nameLines.length - 1) * (nameSize + 8);
 
-  y += 42;
+  y += TITLE_GAP;
   ctx.fillStyle = dna.color;
   ctx.font = `700 26px ${FONT}`;
   // 称号 + 标语可能很长，超宽时换行，避免压到下面的属性条
-  for (const line of wrap(ctx, `${dna.level.title} · ${dna.tagline}`, nameMaxW, 2)) {
-    ctx.fillText(line, W / 2, y);
-    y += 34;
-  }
+  titleLines.forEach((line, i) => {
+    ctx.fillText(line, W / 2, y + i * 34);
+  });
+  y += (titleLines.length - 1) * 34;
 
   // ---- 属性条
-  y += 48;
+  y += BARS_GAP;
   const barX = CARD_X + 48;
   const barW = CARD_W - 96;
   ATTRIBUTE_KEYS.forEach((key, i) => {
     const meta = ATTRIBUTE_META[key];
     const v = dna.attributes[key];
-    const rowY = y + i * 58;
+    const rowY = y + i * BAR_PITCH;
 
     ctx.textAlign = 'left';
     ctx.fillStyle = '#241a14';
@@ -613,7 +633,9 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
     ctx.font = `700 26px ${FONT}`;
     ctx.fillText(String(v), barX + barW, rowY);
   });
-  y += 2 * 58 + 30;
+  // y 仍停在第一条属性栏基线；按实际行数推进，再留呼吸位
+  // （曾经这里写死 2 行，而属性实际是 3 条，「配方」标题直接压到第三条栏上）
+  y += (attrCount - 1) * BAR_PITCH + 4 + AFTER_BARS;
 
   // ---- 配方
   ctx.textAlign = 'left';
@@ -628,9 +650,9 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
     ctx.font = `400 24px ${FONT}`;
     ctx.fillText('（还没加料，去接入数据解锁配料）', barX, y);
   } else {
-    y += 24;
-    for (const ing of showIngredients) {
-      const rowY = y + 48;
+    y += RECIPE_TO_ROW;
+    showIngredients.forEach((ing, i) => {
+      const rowY = y + i * ING_PITCH;
       // 图标块
       ctx.fillStyle = '#fdf1e2';
       roundRect(ctx, barX, rowY - 30, 50, 50, 15);
@@ -654,14 +676,14 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
       ctx.fillStyle = '#a39284';
       ctx.font = `500 21px ${FONT}`;
       ctx.fillText(DNA_SOURCE_LABEL[ing.source] ?? ing.source, barX + barW, rowY + 2);
-      y = rowY;   // 每行推进 48
-    }
-    y += 30;// 配料列表与底栏之间留白
+    });
+    // 停到最后一行配料基线，再留白进完整度区
+    y += (showIngredients.length - 1) * ING_PITCH + AFTER_INGS;
   }
 
-  // ---- 底部信息条
+  // ---- 底部信息条（卡内）
   // 完整度条紧跟内容，并保证与上方有足够间距
-  const footTop = y + 56;
+  const footTop = y + FOOT_GAP;
   ctx.strokeStyle = 'rgba(36,26,20,0.08)';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -684,15 +706,14 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   roundRect(ctx, barX, footTop + 62, Math.max(12, (compW * dna.completeness) / 100), 12, 6);
   ctx.fill();
 
-
   // ---- 内容全部画完，cardH 取实测值
-  // 离屏渲染的好处在这里体现：cardH 就是内容的真实高度，
-  // 主画布按它铺白底，不会裁切也不会留白过多。
-  cardH = Math.min(H - cardTop - FOOT_RESERVE, Math.max(560, footTop + 92 - cardTop));
+  // 舞台大小在预测量阶段已按可用高度收过，这里正常不会触顶；
+  // min 只作最后保险，真触顶了说明版式常量被改坏，应修常量而不是放行裁剪。
+  const cardH = Math.min(availCardH, Math.max(560, footTop + FOOT_BLOCK - cardTop));
 
-  // ---- 页脚：声明 + 二维码
-  const footY = cardTop + cardH + 74;
-  const textMaxW = W - CARD_X * 2 - 190; // 给右侧二维码留位
+  // ---- 页脚：声明 + 二维码（卡外）
+  // 与卡内完整度区之间隔着 FOOT_OUT_GAP，两段文字各在各的地盘，不会再叠
+  const footY = cardTop + cardH + FOOT_OUT_GAP;
 
   ctx.textAlign = 'left';
   ctx.fillStyle = '#241a14';
@@ -703,16 +724,14 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   ctx.font = `400 20px ${FONT}`;
   const notes = ['趣味娱乐内容 · 非麦当劳官方产品', '投喂效果为虚拟机制，不影响真实 AI 能力'];
   notes.forEach((t, i) => {
-    const lines = wrap(ctx, t, textMaxW, 1);
-    lines.forEach((line, j) => {
-      ctx.fillText(line, CARD_X, footY + 34 + (i * 2 + j) * 28);
-    });
+    ctx.fillText(t, CARD_X, footY + 34 + i * 28);
   });
 
   if (qrUrl) {
-    const qrSize = 150;
+    const qrSize = 148;
     const qx = W - CARD_X - qrSize;
-    const qy = footY - 96;
+    // 二维码顶边贴在卡片底边之下，不再探进卡里；底边与两行声明大致收齐
+    const qy = footY - 58;
     if (!renderQr(ctx, qrUrl, qx, qy, qrSize)) {
       // 生成失败时诚实回退，不画假二维码
       ctx.fillStyle = 'rgba(36,26,20,0.05)';

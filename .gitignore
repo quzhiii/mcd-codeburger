@@ -65,3 +65,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# --- 分享卡本地验证页（仅开发用） ---
+/share-card-harness.html
