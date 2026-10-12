@@ -510,24 +510,30 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   // 1. 属性条行数曾经写死成 2（实际 3 条），「配方」标题直接压到第三条属性栏上；
   // 2. 卡片高度曾经按固定值截断，数据完整度区被切到卡外，和页脚声明叠成一团。
   // 现在所有间距集中在此，高度先算后画，从根上消除这两类错位。
+  //
+  // 一轮返工后的间距原则：
+  // - 「配方」与属性条之间（AFTER_BARS）必须明显大于属性行距，才读得出新章节；
+  // - 配料章高 50，行距必须 ≥ 60 才不会叠在一起；
+  // - 标签 / 角色名 / 称号三行要留出气口，不能贴死。
   const cardTop = 108;
-  const PAD_TOP = 24;        // 卡片顶边 → 角色舞台
-  const LABEL_GAP = 54;      // 舞台底 → 「你的 AI 汉堡」
-  const NAME_GAP = 46;       // 标签 → 角色名基线
-  const TITLE_GAP = 38;      // 角色名 → 称号基线
+  const PAD_TOP = 20;        // 卡片顶边 → 角色舞台
+  const LABEL_GAP = 40;      // 舞台底 → 「你的 AI 汉堡」
+  const NAME_GAP = 58;       // 标签 → 角色名基线
+  const TITLE_GAP = 56;      // 角色名 → 称号基线
   const BARS_GAP = 44;       // 称号 → 第一条属性栏
   const BAR_PITCH = 58;      // 属性栏行距
-  const AFTER_BARS = 26;     // 最后一条属性栏 → 「配方」
-  const RECIPE_TO_ROW = 66;  // 「配方」→ 第一行配料
-  const ING_PITCH = 46;      // 配料行距
-  const AFTER_INGS = 24;     // 最后一行配料 → 完整度区分隔线
-  const FOOT_GAP = 48;       // 配料区 → 完整度区分隔线（卡内）
-  const FOOT_BLOCK = 88;     // 分隔线 → 卡片内容底边
-  const STAGE_MAX = 480;     // 角色舞台上限
+  const AFTER_BARS = 64;     // 最后一条属性栏 → 「配方」
+  const RECIPE_TO_ROW = 62;  // 「配方」→ 第一行配料
+  const ING_PITCH = 62;      // 配料行距（章高 50，留 12 的缝）
+  const AFTER_INGS = 20;     // 最后一行配料 → 完整度区分隔线
+  const FOOT_GAP = 44;       // 配料区 → 完整度区分隔线（卡内）
+  const FOOT_BLOCK = 84;     // 分隔线 → 卡片内容底边
+  const STAGE_MAX = 432;     // 角色舞台上限
   const STAGE_MIN = 300;     // 内容再挤也不能低于这个值
-  const FOOT_OUT_GAP = 64;   // 卡片底边 → 页脚标题基线（卡外）
-  // 卡外页脚实际占用：标题基线 + 两行声明 + 二维码底 + 底部边距
-  const FOOT_RESERVE = FOOT_OUT_GAP + 90 + 14;
+  const FOOT_OUT_GAP = 56;   // 卡片底边 → 页脚标题基线（卡外）
+  const QR_SIZE = 138;       // 二维码边长
+  // 卡外页脚实际占用：标题基线 + 两行声明 + 二维码（footY + QR_SIZE - 50）+ 底部边距
+  const FOOT_RESERVE = FOOT_OUT_GAP + (QR_SIZE - 50) + 12;
 
   const nameMaxW = CARD_W - 96;
   const attrCount = ATTRIBUTE_KEYS.length;
@@ -728,10 +734,10 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   });
 
   if (qrUrl) {
-    const qrSize = 148;
+    const qrSize = QR_SIZE;
     const qx = W - CARD_X - qrSize;
-    // 二维码顶边贴在卡片底边之下，不再探进卡里；底边与两行声明大致收齐
-    const qy = footY - 58;
+    // 二维码顶边贴在卡片底边之下（footY - 50 = 卡片底边 + 6），不探进卡里
+    const qy = footY - 50;
     if (!renderQr(ctx, qrUrl, qx, qy, qrSize)) {
       // 生成失败时诚实回退，不画假二维码
       ctx.fillStyle = 'rgba(36,26,20,0.05)';

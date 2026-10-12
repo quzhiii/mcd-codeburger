@@ -61,12 +61,18 @@ const EQUIPMENT_PAINTERS: Record<EquipmentSlot, (color: string, glyph: string) =
     </g>`,
 
   // 面部：眼镜 / 芯片
-  face: (color, glyph) => `
+  //
+  // 定位说明：镜片必须落在底图的「眼睛」上。八张底图的五官位置略有差异
+  // （辣椒堡眼睛 y≈132-148，芝士堡 y≈112-135），这里取能同时框住两者的
+  // 折中坐标（镜片带 y 116-146，横跨两张图的眼距）。
+  // 曾经写成 y176-206，整副眼镜掉在嘴巴下面，看起来像贴上去的。
+  // 另：不再在镜片下方画 glyph 小字 —— 它会和中排配料章叠在一起，
+  // 渲染出来就是一个悬浮的噪点。
+  face: (color) => `
     <g class="cb-eq cb-eq--face">
-      <rect x="142" y="176" width="48" height="30" rx="12" fill="none" stroke="${color}" stroke-width="7" opacity="0.95"/>
-      <rect x="210" y="176" width="48" height="30" rx="12" fill="none" stroke="${color}" stroke-width="7" opacity="0.95"/>
-      <path d="M190 191 L210 191" stroke="${color}" stroke-width="7"/>
-      <text x="200" y="232" font-size="13" text-anchor="middle" fill="${color}">${escSvg(glyph)}</text>
+      <rect x="136" y="116" width="48" height="30" rx="12" fill="none" stroke="${color}" stroke-width="6" opacity="0.95"/>
+      <rect x="214" y="116" width="48" height="30" rx="12" fill="none" stroke="${color}" stroke-width="6" opacity="0.95"/>
+      <path d="M184 131 L214 131" stroke="${color}" stroke-width="6"/>
     </g>`,
 
   // 颈部：围巾 / 围兜
@@ -76,10 +82,15 @@ const EQUIPMENT_PAINTERS: Record<EquipmentSlot, (color: string, glyph: string) =
     </g>`,
 
   // 手持：物品
+  //
+  // 位置说明：原来在 (296,196)，右下方正好压住第三枚配料章
+  // （★ 星星酱，位置 275-317 × 225-267），★ 几乎被整个盖住。
+  // 上移到举起的道具杆旁边（148-206），既不压配料章，也不压镜片，
+  // 视觉上像是挂在道具上。
   hand: (color, glyph) => `
     <g class="cb-eq cb-eq--hand">
-      <rect x="296" y="196" width="44" height="58" rx="10" fill="${color}" opacity="0.9"/>
-      <text x="318" y="232" font-size="22" text-anchor="middle" fill="#fff">${escSvg(glyph)}</text>
+      <rect x="302" y="148" width="44" height="58" rx="10" fill="${color}" opacity="0.9"/>
+      <text x="324" y="184" font-size="22" text-anchor="middle" fill="#fff">${escSvg(glyph)}</text>
     </g>`,
 
   // 背部：翅膀 / 装饰
