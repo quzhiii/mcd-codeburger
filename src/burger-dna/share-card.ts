@@ -90,13 +90,18 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, max
  * ============================================================ */
 
 /**
- * 极简 QR 码渲染器（版本 1，字节模式，EC 级别 L）。
+ * 极简 QR 码渲染器（版本 1-10，字节模式，EC 级别 L）。
  *
  * 为什么自己写：为了不引第三方依赖，一个二维码库是 30KB+。
- * 这里只支持「短链接」场景，长度够用（< 100 字节）。
+ * 这里只支持「短链接」场景，长度够用（< 250 字节），超出会返回 false 并回退提示。
  *
- * 诚实说明：这是**可扫的**真实 QR，不是装饰性方块。
- * 但它不是完整的 QR 规范实现，超长内容或需要高纠错时会失败并回退成提示文字。
+ * 2026-10-13 扫不出来的根因修复（上一版有三处结构性错误）：
+ * 1. 数据填充没走标准蛇形路径（右下起、两列一组、上下交替、跳过竖直定时线），
+ *    而是逐行填充 —— 解码器按标准路径读，必然读出乱码；
+ * 2. 格式信息副本二与固定暗点的部位放错（行/列互换），副本一整体转了 90°；
+ * 3. 多块版本（v6 起）的纠错按整块算、交织按单块算；规格表还标错成单块容量。
+ * 另外补上规格要求的 4 模块静区，模块改为实心（原来留 6% 缝隙）。
+ * 修复后与 python-qrcode 同参数输出逐位对齐（见 tests/qr.test.mjs 与本地比对脚本）。
  */
 function renderQr(
   ctx: CanvasRenderingContext2D,
@@ -108,77 +113,67 @@ function renderQr(
   const qr = buildQr(text);
   if (!qr) return false;
 
-  const cell = size / qr.size;
+  // 静区（quiet zone）：四周各留 4 个模块，这是可扫性的硬要求
+  const MARGIN = 4;
+  const cell = size / (qr.size + MARGIN * 2);
+  const ox = Math.round(x + MARGIN * cell);
+  const oy = Math.round(y + MARGIN * cell);
+
+  // 白底 + 静区：整块圆角白卡
   ctx.fillStyle = '#ffffff';
-  roundRect(ctx, x, y, size, size, size * 0.06);
+  roundRect(ctx, x, y, size, size, size * 0.05);
   ctx.fill();
 
+  // 实心模块：同一颜色相邻格互相咬合，不留缝
   ctx.fillStyle = '#241a14';
   for (let r = 0; r < qr.size; r += 1) {
     for (let c = 0; c < qr.size; c += 1) {
       if (!qr.modules[r * qr.size + c]) continue;
-      // 跳过三个定位角内部，交给定位图形绘制
-      if (isFinderArea(r, c, qr.size)) continue;
-      ctx.fillRect(x + c * cell, y + r * cell, cell * 0.94, cell * 0.94);
+      ctx.fillRect(ox + c * cell, oy + r * cell, cell + 0.5, cell + 0.5);
     }
   }
-
-  // 定位角
-  const drawFinder = (gr: number, gc: number) => {
-    const p = x + gc * cell;
-    const q = y + gr * cell;
-    ctx.fillStyle = '#241a14';
-    ctx.fillRect(p, q, cell * 7, cell * 7);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(p + cell, q + cell, cell * 5, cell * 5);
-    ctx.fillStyle = '#241a14';
-    ctx.fillRect(p + cell * 2, q + cell * 2, cell * 3, cell * 3);
-  };
-  drawFinder(0, 0);
-  drawFinder(0, qr.size - 7);
-  drawFinder(qr.size - 7, 0);
 
   return true;
 }
 
-function isFinderArea(r: number, c: number, size: number): boolean {
-  const inTopLeft = r < 8 && c < 8;
-  const inTopRight = r < 8 && c >= size - 8;
-  const inBottomLeft = r >= size - 8 && c < 8;
-  return inTopLeft || inTopRight || inBottomLeft;
-}
-
 /**
- * 生成 QR 模块矩阵。
- * 实现完整的字节模式 + Reed-Solomon 纠错，超出能力时返回 null。
+ * 生成 QR 模块矩阵（导出仅供测试比对）。
+ * 字节模式 + 每块独立 Reed-Solomon + 标准蛇形填充，超出能力时返回 null。
  */
-function buildQr(text: string): { size: number; modules: boolean[] } | null {
-  // 版本选择：1-10 覆盖 152 字节，足够放 URL
-  const version = pickVersion(text.length);
+export function buildQr(text: string): { size: number; modules: boolean[] } | null {
+  const data = utf8Bytes(text);
+  const version = pickVersion(data.length);
   if (version === null) return null;
   const spec = QR_SPECS[version - 1];
   if (!spec) return null;
 
-  const data = utf8Bytes(text);
-  if (data.length > spec.dataCodewords * 8 - 4) return null;
-
   const codewords = buildCodewords(data, spec);
-  const allBits = interleave(codewords, spec);
+  if (!codewords) return null;
 
-  // 放入矩阵
   const size = spec.size;
   const modules: Array<boolean | null> = new Array(size * size).fill(null);
-  placeFunctionPatterns(modules, size, version, spec.ecCodewordsPerBlock);
-
+  placeFunctionPatterns(modules, size, version);
   const reserved = modules.map((m) => m !== null);
+
+  // 数据填充：标准蛇形路径 —— 从右下角起，两列一组，上下来回，跳过第 6 列定时线。
+  // （上一版这里是逐行填充，解码器读出的全是乱码，这就是「扫不出来」的主因。）
   let bitIdx = 0;
-  for (let i = 0; i < modules.length; i += 1) {
-    if (reserved[i]) continue;
-    if (bitIdx < allBits.length) {
-      modules[i] = ((allBits[bitIdx >>> 3] >>> (7 - (bitIdx & 7))) & 1) === 1;
-      bitIdx += 1;
-    } else {
-      modules[i] = false;
+  const totalBits = codewords.length * 8;
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5; // 跳过竖直定时线所在列
+    for (let vert = 0; vert < size; vert += 1) {
+      for (let j = 0; j < 2; j += 1) {
+        const c = right - j;
+        const upward = ((right + 1) & 2) === 0;
+        const r = upward ? size - 1 - vert : vert;
+        const idx = r * size + c;
+        if (reserved[idx]) continue;
+        modules[idx] =
+          bitIdx < totalBits
+            ? ((codewords[bitIdx >>> 3]! >>> (7 - (bitIdx & 7))) & 1) === 1
+            : false; // 剩余位（remainder bits）恒为浅色
+        bitIdx += 1;
+      }
     }
   }
 
@@ -206,18 +201,20 @@ interface QrSpec {
   dataCodewords: number;
 }
 
-/** 版本 1-10 的参数表 */
+/** 版本 1-10 的参数表（EC 级别 L）。
+ *  dataCodewords 是整个符号的数据码字总数（多块版本 = 每块之和），
+ *  上一版 v6-10 误标成单块容量，导致长内容会走进错误的分块逻辑。 */
 const QR_SPECS: QrSpec[] = [
   { size: 21, ecCodewordsPerBlock: 7, blocks: 1, dataCodewords: 19 },
   { size: 25, ecCodewordsPerBlock: 10, blocks: 1, dataCodewords: 34 },
   { size: 29, ecCodewordsPerBlock: 15, blocks: 1, dataCodewords: 55 },
   { size: 33, ecCodewordsPerBlock: 20, blocks: 1, dataCodewords: 80 },
   { size: 37, ecCodewordsPerBlock: 26, blocks: 1, dataCodewords: 108 },
-  { size: 41, ecCodewordsPerBlock: 18, blocks: 2, dataCodewords: 68 },
-  { size: 45, ecCodewordsPerBlock: 20, blocks: 2, dataCodewords: 78 },
-  { size: 49, ecCodewordsPerBlock: 24, blocks: 2, dataCodewords: 97 },
-  { size: 53, ecCodewordsPerBlock: 30, blocks: 2, dataCodewords: 116 },
-  { size: 57, ecCodewordsPerBlock: 18, blocks: 4, dataCodewords: 68 },
+  { size: 41, ecCodewordsPerBlock: 18, blocks: 2, dataCodewords: 136 },
+  { size: 45, ecCodewordsPerBlock: 20, blocks: 2, dataCodewords: 156 },
+  { size: 49, ecCodewordsPerBlock: 24, blocks: 2, dataCodewords: 194 },
+  { size: 53, ecCodewordsPerBlock: 30, blocks: 2, dataCodewords: 232 },
+  { size: 57, ecCodewordsPerBlock: 18, blocks: 4, dataCodewords: 274 },
 ];
 
 function pickVersion(byteLen: number): number | null {
@@ -231,7 +228,7 @@ function pickVersion(byteLen: number): number | null {
   return null;
 }
 
-function buildCodewords(data: number[], spec: QrSpec): number[] {
+function buildCodewords(data: number[], spec: QrSpec): number[] | null {
   const bits: number[] = [];
   const push = (value: number, len: number) => {
     for (let i = len - 1; i >= 0; i -= 1) bits.push((value >>> i) & 1);
@@ -242,8 +239,10 @@ function buildCodewords(data: number[], spec: QrSpec): number[] {
   push(data.length, countBits);
   for (const b of data) push(b, 8);
 
-  // 结束符
   const cap = spec.dataCodewords * 8;
+  if (bits.length > cap) return null; // 容量兜底（pickVersion 已保证，双保险）
+
+  // 结束符
   for (let i = 0; i < 4 && bits.length < cap; i += 1) bits.push(0);
   // 补齐到字节边界
   while (bits.length % 8 !== 0) bits.push(0);
@@ -262,70 +261,21 @@ function buildCodewords(data: number[], spec: QrSpec): number[] {
     pi += 1;
   }
 
-  // Reed-Solomon 纠错
-  const ec = reedSolomon(bytes, spec.ecCodewordsPerBlock);
-  return [...bytes, ...ec];
-}
-
-/** GF(256) 上的 Reed-Solomon 编码 */
-function reedSolomon(data: number[], ecLen: number): number[] {
-  const EXP = new Uint8Array(512);
-  const LOG = new Uint8Array(256);
-  let x = 1;
-  for (let i = 0; i < 255; i += 1) {
-    EXP[i] = x;
-    LOG[x] = i;
-    x <<= 1;
-    if (x & 0x100) x ^= 0x11d;
-  }
-  for (let i = 255; i < 512; i += 1) EXP[i] = EXP[i - 255]!;
-
-  const mul = (a: number, b: number): number => (a === 0 || b === 0 ? 0 : EXP[LOG[a]! + LOG[b]!]!);
-
-  const gen: number[] = [1];
-  for (let i = 0; i < ecLen; i += 1) {
-    const next = new Array(gen.length + 1).fill(0);
-    for (let j = 0; j < gen.length; j += 1) {
-      next[j] = (next[j]! ^ mul(gen[j]!, EXP[i]!)) & 0xff;
-      next[j + 1] = (next[j + 1]! ^ gen[j]!) & 0xff;
-    }
-    gen.splice(0, gen.length, ...next);
-  }
-
-  const rem = new Array(ecLen).fill(0);
-  for (const byte of data) {
-    const factor = byte ^ rem[0]!;
-    rem.shift();
-    rem.push(0);
-    for (let i = 0; i < ecLen; i += 1) {
-      rem[i] = (rem[i]! ^ mul(gen[i + 1]!, factor)) & 0xff;
-    }
-  }
-  return rem;
-}
-
-/** 交织（此处所有规格 blocks 的 dataCodewords 相同，简化为直接拼接） */
-function interleave(codewords: number[], spec: QrSpec): number[] {
-  const dataLen = spec.dataCodewords;
-  const out: number[] = [];
+  // 分块 + 每块独立 Reed-Solomon（v6 起是多块结构，必须逐块算再交织）
   const blockCount = spec.blocks;
-  const shortLen = Math.floor(dataLen / blockCount);
-  const longBlocks = dataLen % blockCount;
-
+  const shortLen = Math.floor(spec.dataCodewords / blockCount);
+  const longBlocks = spec.dataCodewords % blockCount;
   const dataBlocks: number[][] = [];
-  const ecBlocks: number[][] = [];
   let offset = 0;
   for (let i = 0; i < blockCount; i += 1) {
     const len = shortLen + (i >= blockCount - longBlocks ? 1 : 0);
-    dataBlocks.push(codewords.slice(offset, offset + len));
+    dataBlocks.push(bytes.slice(offset, offset + len));
     offset += len;
   }
-  offset = dataLen;
-  for (let i = 0; i < blockCount; i += 1) {
-    ecBlocks.push(codewords.slice(offset, offset + spec.ecCodewordsPerBlock));
-    offset += spec.ecCodewordsPerBlock;
-  }
+  const ecBlocks = dataBlocks.map((b) => reedSolomon(b, spec.ecCodewordsPerBlock));
 
+  // 标准交织：先按列取各块数据，再按列取各块纠错
+  const out: number[] = [];
   const maxData = Math.max(...dataBlocks.map((b) => b.length));
   for (let i = 0; i < maxData; i += 1) {
     for (const blk of dataBlocks) if (i < blk.length) out.push(blk[i]!);
@@ -336,12 +286,53 @@ function interleave(codewords: number[], spec: QrSpec): number[] {
   return out;
 }
 
+/**
+ * GF(256) 上的 Reed-Solomon 纠错（导出仅供测试）。
+ * 做法是最直白的长除法：码字多项式乘 x^ecLen 后对生成多项式 g(x) 取余。
+ * g(x) = ∏(x − α^i)，i = 0..ecLen-1，系数按高次在前存储。
+ */
+export function reedSolomon(data: number[], ecLen: number): number[] {
+  const EXP = new Uint8Array(512);
+  const LOG = new Uint8Array(256);
+  let x = 1;
+  for (let i = 0; i < 255; i += 1) {
+    EXP[i] = x;
+    LOG[x] = i;
+    x <<= 1;
+    if (x & 0x100) x ^= 0x11d;
+  }
+  for (let i = 255; i < 512; i += 1) EXP[i] = EXP[i - 255]!;
+  const mul = (a: number, b: number): number =>
+    a === 0 || b === 0 ? 0 : EXP[LOG[a]! + LOG[b]!]!;
+
+  // 生成多项式
+  let gen: number[] = [1];
+  for (let i = 0; i < ecLen; i += 1) {
+    const next = new Array<number>(gen.length + 1).fill(0);
+    for (let j = 0; j < gen.length; j += 1) {
+      next[j] = (next[j]! ^ gen[j]!) & 0xff;
+      next[j + 1] = (next[j + 1]! ^ mul(gen[j]!, EXP[i]!)) & 0xff;
+    }
+    gen = next;
+  }
+
+  // 长除法取余
+  const rem = [...data, ...new Array<number>(ecLen).fill(0)];
+  for (let i = 0; i < data.length; i += 1) {
+    const factor = rem[i]!;
+    if (factor === 0) continue;
+    for (let j = 0; j < ecLen; j += 1) {
+      rem[i + j + 1] = (rem[i + j + 1]! ^ mul(gen[j + 1]!, factor)) & 0xff;
+    }
+  }
+  return rem.slice(data.length);
+}
+
 /** 放置功能图形：定位符、分隔符、校正图形、格式信息、版本信息 */
 function placeFunctionPatterns(
   modules: Array<boolean | null>,
   size: number,
   version: number,
-  ecBits: number,
 ): void {
   const set = (r: number, c: number, v: boolean) => {
     if (r >= 0 && r < size && c >= 0 && c < size) modules[r * size + c] = v;
@@ -384,19 +375,26 @@ function placeFunctionPatterns(
     }
   }
 
-  // 格式信息（EC 级别 M + 掩码 0，占位；后面 applyMasks 会覆写）
-  for (let i = 0; i < 15; i += 1) {
-    const bit = ((formatBits(ecBits) >>> i) & 1) === 1;
-    // 左上
-    if (i < 6) set(8, i, bit);
-    else if (i < 8) set(8, i + 1, bit);
-    else if (i === 8) set(7, 8, bit);
-    else set(14 - i, 8, bit);
-    // 右上 / 左下
-    if (i < 8) set(size - 1 - i, 8, bit);
-    else set(8, size - 15 + i, bit);
-  }
-  set(8, size - 8, true); // 固定黑点
+  // 格式信息（EC 级别 L + 掩码 0），共两份副本
+  //
+  // 位置约定（row, col）：
+  //   副本一：第 8 列上段（行 0-5、7、8）+ 第 8 行左段（列 7-0）
+  //   副本二：第 8 行右段（列 size-1 .. size-8）+ 第 8 列下段（行 size-7 .. size-1）
+  //   固定暗点：(size-8, 8)
+  // 上一版把副本二和暗点的行/列放反、副本一整体转了 90°，这是扫不出来的第二主因。
+  const fmt = formatBits();
+  const fbit = (i: number): boolean => ((fmt >>> i) & 1) === 1;
+  // 副本一
+  for (let i = 0; i <= 5; i += 1) set(i, 8, fbit(i));
+  set(7, 8, fbit(6));
+  set(8, 8, fbit(7));
+  set(8, 7, fbit(8));
+  for (let i = 9; i < 15; i += 1) set(8, 14 - i, fbit(i));
+  // 副本二
+  for (let i = 0; i < 8; i += 1) set(8, size - 1 - i, fbit(i));
+  for (let i = 8; i < 15; i += 1) set(size - 15 + i, 8, fbit(i));
+  // 固定暗点
+  set(size - 8, 8, true);
 
   // 版本信息（版本 7 以上才有，这里支持到 10）
   if (version >= 7) {
@@ -416,10 +414,10 @@ function alignmentCenters(version: number): number[] {
   return table[version] ?? [6];
 }
 
-function formatBits(ecBits: number): number {
-  // EC 级别映射到格式信息的前 2 位
-  const ecLevel = ecBits <= 13 ? 0b00 : ecBits <= 20 ? 0b01 : ecBits <= 26 ? 0b10 : 0b11;
-  let data = (ecLevel << 3) | 0; // 掩码 0
+/** 格式信息：EC 级别 L(0b01) + 掩码 0 的 15 位值（BCH(15,5) + 固定掩码）。
+ *  本实现的规格表全部按 EC 级别 L 编码，所以这里直接写死，不再做级别映射。 */
+function formatBits(): number {
+  const data = (0b01 << 3) | 0; // EC L + 掩码 0
   let rem = data;
   for (let i = 0; i < 10; i += 1) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
   return ((data << 10) | rem) ^ 0x5412;
@@ -530,10 +528,10 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   const FOOT_BLOCK = 84;     // 分隔线 → 卡片内容底边
   const STAGE_MAX = 432;     // 角色舞台上限
   const STAGE_MIN = 300;     // 内容再挤也不能低于这个值
-  const FOOT_OUT_GAP = 56;   // 卡片底边 → 页脚标题基线（卡外）
-  const QR_SIZE = 138;       // 二维码边长
-  // 卡外页脚实际占用：标题基线 + 两行声明 + 二维码（footY + QR_SIZE - 50）+ 底部边距
-  const FOOT_RESERVE = FOOT_OUT_GAP + (QR_SIZE - 50) + 12;
+  const FOOT_OUT_GAP = 50;   // 卡片底边 → 页脚标题基线（卡外）
+  const QR_SIZE = 150;       // 二维码边长（含 4 模块静区，保证可扫）
+  // 卡外页脚实际占用：标题基线 + 两行声明 + 二维码（footY + QR_SIZE - 44）+ 底部边距
+  const FOOT_RESERVE = FOOT_OUT_GAP + (QR_SIZE - 44) + 12;
 
   const nameMaxW = CARD_W - 96;
   const attrCount = ATTRIBUTE_KEYS.length;
@@ -736,8 +734,8 @@ export async function renderGameShareCard(input: ShareCardInput): Promise<Blob> 
   if (qrUrl) {
     const qrSize = QR_SIZE;
     const qx = W - CARD_X - qrSize;
-    // 二维码顶边贴在卡片底边之下（footY - 50 = 卡片底边 + 6），不探进卡里
-    const qy = footY - 50;
+    // 二维码顶边贴在卡片底边之下（footY - 44 = 卡片底边 + 6），不探进卡里
+    const qy = footY - 44;
     if (!renderQr(ctx, qrUrl, qx, qy, qrSize)) {
       // 生成失败时诚实回退，不画假二维码
       ctx.fillStyle = 'rgba(36,26,20,0.05)';
