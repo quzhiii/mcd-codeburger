@@ -9,7 +9,8 @@ import { PERSONAS } from '../persona/personas.ts';
 import type { AppState, Screen } from '../app/state.ts';
 import { agentLine } from '../app/state.ts';
 import { AGENT_STATE_META } from '../spec/burger-spec.ts';
-import { renderShareCard, downloadBlob } from './share-card.ts';
+import { renderGameShareCard, downloadBlob } from '../burger-dna/share-card.ts';
+import { buildWebDna } from '../burger-dna/web-dna.ts';
 
 const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) =>
@@ -248,15 +249,21 @@ function renderFeed(state: AppState): string {
 /* ==================== 分享屏 ==================== */
 
 function renderShare(state: AppState): string {
-  if (!state.result || !state.spec) return '';
+  if (!state.result) return '';
   const p = state.result.persona;
   const meta = AGENT_STATE_META[state.feedState?.state ?? 'idle'];
+  const dna = buildWebDna({
+    persona: p,
+    vec: state.result.vec,
+    toppings: state.toppings,
+    github: state.githubProfile,
+  });
 
   return `
     <div class="screen screen--share">
       <div class="topbar">
         <span class="brand-en">CodeBurger</span>
-        <span class="chip">3:4 分享卡</span>
+        <span class="chip">3:4 角色卡</span>
       </div>
 
       <div class="share-preview" id="share-preview">
@@ -269,6 +276,10 @@ function renderShare(state: AppState): string {
           <span class="share-v">${esc(p.name)}</span>
         </div>
         <div class="share-row">
+          <span class="share-k">等级</span>
+          <span class="share-v">Lv.${dna.level.level} · ${esc(dna.level.title)}</span>
+        </div>
+        <div class="share-row">
           <span class="share-k">Agent 状态</span>
           <span class="share-v" style="color:${meta.color}">${meta.label}</span>
         </div>
@@ -279,6 +290,8 @@ function renderShare(state: AppState): string {
       </div>
 
       <button class="btn btn--primary" data-act="export">生成并保存 PNG</button>
+
+      <p class="fine">卡面由答题与 GitHub 加料数据生成，会标注数据完整度。</p>
 
       <button class="btn btn--ghost" data-act="restart">再测一次</button>
     </div>`;
@@ -303,14 +316,19 @@ export function renderScreen(state: AppState): string {
   }
 }
 
-/** 导出分享卡并触发下载 */
+/** 导出分享卡并触发下载（游戏角色卡版，数据取自答题 + GitHub 加料） */
 export async function exportShareCard(state: AppState): Promise<void> {
-  if (!state.spec || !state.result) return;
-  const blob = await renderShareCard({
-    spec: state.spec,
-    state: state.feedState?.state ?? 'idle',
-    portraitUrl: personaAsset(state.result.persona.id),
-    githubUsername: state.githubProfile?.username ?? null,
+  if (!state.result) return;
+  const dna = buildWebDna({
+    persona: state.result.persona,
+    vec: state.result.vec,
+    toppings: state.toppings,
+    github: state.githubProfile,
+  });
+  const blob = await renderGameShareCard({
+    dna,
+    baseUrl: personaAsset(state.result.persona.id),
+    qrUrl: 'https://codeburger.app.workbuddy.host/',
   });
   downloadBlob(blob, `codeburger-${state.result.persona.id}.png`);
 }

@@ -14,8 +14,9 @@ import type { VirtualTopping } from '../spec/burger-spec.ts';
 
 const API = 'https://api.github.com';
 
-/** 语言 → 中文配料名与口味描述的映射表 */
-const LANGUAGE_TOPPING: Record<string, { label: string; flavor: string; glyph: string }> = {
+/** 语言 → 中文配料名与口味描述的映射表。
+ *  export 给 burger-dna/web-dna.ts 复用（装配角色卡时需要同一份字形与语义）。 */
+export const LANGUAGE_TOPPING: Record<string, { label: string; flavor: string; glyph: string }> = {
   TypeScript: { label: 'typescript 脆片', flavor: '入口带一点甜，越嚼越上头', glyph: 'TS' },
   JavaScript: { label: 'javascript 软糖', flavor: '看着软，实际粘手', glyph: 'JS' },
   Python: { label: 'python 浓汤', flavor: '温热，慢炖，不能催', glyph: 'PY' },
