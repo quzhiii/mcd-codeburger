@@ -126,7 +126,7 @@ Burger Spec 是本地 Skill 与网页之间的公共数据契约，定义在 `sr
 npm install       # 遇到 esbuild postinstall 报错见下方 Troubleshooting
 npm run dev       # 本地开发，端口 5180
 npm run build     # 产出纯静态 dist/
-npm test          # 49 条单元测试
+npm test          # 100 条单元测试
 npm run typecheck # 类型检查
 npm run gate:a    # 重跑 MCP 合规取证（需要自己的 Token）
 npm run skill:demo  # Burger Spec 本地自检
@@ -165,9 +165,10 @@ tests/             人格引擎、解析层、契约、投喂、GitHub 加料
 
 **已验证**：codeburger-feed Skill 用本人凭证真实调用麦当劳 MCP 官方服务
 （`list-nutrition-foods` 返回 160 条并解析成功）；Burger Spec 契约校验；
-49 条单元测试 + CI（类型检查 / 构建 / 凭证扫描 / 内部材料防复发）。
+100 条单元测试 + CI（类型检查 / 构建 / 凭证扫描 / 内部材料防复发）。
 
-**进行中**：视觉细节打磨、移动端真机验证、真实用户传播。
+**进行中**：角色卡引擎（Burger DNA / 程序化叠加层 / 游戏角色卡分享卡）接入主流程、
+移动端真机验证、真实用户传播。
 
 ## 声明
 
